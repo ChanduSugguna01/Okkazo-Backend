@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome to {{platformName}}</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 600px;
+      margin: 20px auto;
+      background: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .header {
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      color: #ffffff;
+      padding: 40px 30px;
+      text-align: center;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 32px;
+    }
+    .content {
+      padding: 40px 30px;
+    }
+    .content h2 {
+      color: #4facfe;
+      margin-top: 0;
+    }
+    .button {
+      display: inline-block;
+      padding: 14px 32px;
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      color: #ffffff;
+      text-decoration: none;
+      border-radius: 5px;
+      margin: 20px 0;
+      font-weight: bold;
+      transition: transform 0.2s;
+    }
+    .button:hover {
+      transform: translateY(-2px);
+    }
+    .feature-box {
+      background: #f8f9fa;
+      border-radius: 5px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+    .feature-item {
+      margin: 15px 0;
+      padding-left: 30px;
+      position: relative;
+    }
+    .feature-item::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: #4facfe;
+      font-weight: bold;
+      font-size: 20px;
+    }
+    .footer {
+      background: #f8f9fa;
+      padding: 20px;
+      text-align: center;
+      font-size: 12px;
+      color: #666;
+    }
+    .footer a {
+      color: #4facfe;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🎊 Welcome, {{username}}!</h1>
+      <p style="margin: 10px 0 0 0; font-size: 18px;">You're all set to get started</p>
+    </div>
+    
+    <div class="content">
+      <h2>Welcome to {{platformName}}!</h2>
+      
+      <p>Hi {{username}},</p>
+      
+      <p>Congratulations! Your email has been verified and your account is now active. We're thrilled to have you as part of the {{platformName}} community! 🚀</p>
+      
+      <div class="feature-box">
+        <h3 style="margin-top: 0; color: #4facfe;">What you can do now:</h3>
+        <div class="feature-item">Complete your profile to personalize your experience</div>
+        <div class="feature-item">Explore our platform features and tools</div>
+        <div class="feature-item">Connect with other users and vendors</div>
+        <div class="feature-item">Start your journey with {{platformName}}</div>
+      </div>
+      
+      <div style="text-align: center;">
+        <a href="{{platformUrl}}" class="button">Get Started</a>
+      </div>
+      
+      <p><strong>Need help getting started?</strong></p>
+      <p>Check out our documentation or reach out to our support team. We're here to help you make the most of {{platformName}}!</p>
+      
+      <p>Thank you for choosing {{platformName}}. We can't wait to see what you'll accomplish!</p>
+      
+      <p>Best regards,<br>The {{platformName}} Team</p>
+    </div>
+    
+    <div class="footer">
+      <p>This is an automated message, please do not reply to this email.</p>
+      <p>Need help? Contact us at <a href="mailto:{{supportEmail}}">{{supportEmail}}</a></p>
+      <p>&copy; 2026 {{platformName}}. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
