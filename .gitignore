@@ -262,3 +262,7 @@ site/
 
 # Archive files
 *.orig
+
+# Ignore specific docker-compose files
+docker-compose.dev.yml
+docker-compose.yml
