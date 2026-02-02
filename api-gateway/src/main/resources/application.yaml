@@ -1,0 +1,119 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      server:
+        webflux:
+          discovery:
+            locator:
+              enabled: true
+              lower-case-service-id: true
+          routes:
+            # Auth Service Routes (Public - No Authentication Required)
+            - id: auth-service-public
+              uri: lb://auth-service
+              predicates:
+                - Path=/auth/**
+              filters:
+                - RewritePath=/auth/(?<segment>.*), /${segment}
+
+            # User Service Routes (Will be added when Node.js service is ready)
+            - id: user-service
+              uri: lb://user-service
+              predicates:
+                - Path=/api/users/**
+              filters:
+                - RewritePath=/api/users/(?<segment>.*), /${segment}
+                - name: AuthenticationFilter
+                - name: RoleAuthorizationFilter
+                  args:
+                    roles: USER,VENDOR,ADMIN,MANAGER
+
+            # Admin Routes - Admin Only
+            - id: admin-routes
+              uri: lb://user-service
+              predicates:
+                - Path=/api/admin/**
+              filters:
+                - RewritePath=/api/admin/(?<segment>.*), /admin/${segment}
+                - name: AuthenticationFilter
+                - name: RoleAuthorizationFilter
+                  args:
+                    roles: ADMIN
+
+            # Vendor Routes - Vendor, Admin, Manager
+            - id: vendor-routes
+              uri: lb://user-service
+              predicates:
+                - Path=/api/vendor/**
+              filters:
+                - RewritePath=/api/vendor/(?<segment>.*), /vendor/${segment}
+                - name: AuthenticationFilter
+                - name: RoleAuthorizationFilter
+                  args:
+                    roles: VENDOR,ADMIN,MANAGER
+
+            # Manager Routes - Manager, Admin
+            - id: manager-routes
+              uri: lb://user-service
+              predicates:
+                - Path=/api/manager/**
+              filters:
+                - RewritePath=/api/manager/(?<segment>.*), /manager/${segment}
+                - name: AuthenticationFilter
+                - name: RoleAuthorizationFilter
+                  args:
+                    roles: MANAGER,ADMIN
+
+            # Email Service Routes (Admin Only)
+            - id: email-service
+              uri: lb://email-service
+              predicates:
+                - Path=/api/email/**
+              filters:
+                - RewritePath=/api/email/(?<segment>.*), /${segment}
+                - name: AuthenticationFilter
+                - name: RoleAuthorizationFilter
+                  args:
+                    roles: ADMIN
+
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowedOrigins:
+                  - "http://localhost:3000"
+                  - "http://localhost:5173"
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - DELETE
+                  - PATCH
+                  - OPTIONS
+                allowedHeaders: "*"
+                allowCredentials: true
+                maxAge: 3600
+
+# JWT Configuration (Must match auth-service)
+jwt:
+  secret: ${JWT_SECRET:your-default-secret-key-change-this-in-production}
+
+# Eureka Client Configuration
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+
+# Logging
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    com.okkazo.apigateway: DEBUG
