@@ -6,6 +6,7 @@ public record UserRegistrationEvent(
         String type,
         UUID authId,
         String email,
+        String username,
         String verificationToken
 ) {
 }

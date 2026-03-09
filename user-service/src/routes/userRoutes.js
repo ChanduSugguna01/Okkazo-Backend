@@ -1,15 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/userController');
-const { authenticate } = require('../middleware/auth');
+const { extractUser } = require('../middleware/extractUser');
 const { authorizeRoles } = require('../middleware/authorization');
 const { validateUser, validateUserUpdate } = require('../middleware/validation');
 
 // Public routes
 router.get('/health', userController.healthCheck);
 
-// Protected routes - require authentication
-router.use(authenticate);
+// Protected routes - user context extracted from API Gateway headers
+router.use(extractUser);
 
 // User profile routes
 router.get('/me', userController.getCurrentUser);

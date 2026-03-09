@@ -60,6 +60,7 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
                 // Add user information to request headers for downstream services
                 ServerHttpRequest modifiedRequest = exchange.getRequest()
                         .mutate()
+                        .header("X-Auth-Id", userId)  // authId (same as userId)
                         .header("X-User-Id", userId)
                         .header("X-User-Email", email)
                         .header("X-User-Username", username)

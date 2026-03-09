@@ -226,6 +226,38 @@ const sendTestEmail = async (to) => {
   }
 };
 
+/**
+ * Send vendor account created email with password setup link
+ */
+const sendVendorAccountCreatedEmail = async (email, passwordResetToken, businessName, applicationId, authId) => {
+  try {
+    if (!email || !passwordResetToken || !businessName || !applicationId) {
+      throw new Error('Email, password reset token, business name, and application ID are required');
+    }
+
+    const template = await loadTemplate('vendor-registration');
+    const setPasswordLink = `${process.env.RESET_PASSWORD_URL}?token=${passwordResetToken}`;
+
+    const html = template({
+      setPasswordLink,
+      businessName,
+      applicationId,
+      email,
+      platformName: 'Okkazo',
+      supportEmail: process.env.FROM_EMAIL,
+      estimatedTime: '2-3 business days',
+      expiryTime: '7 days',
+    });
+
+    await sendEmail(email, 'Vendor Application Received - Set Your Password', html);
+
+    logger.info('Vendor account created email sent', { email, authId, applicationId });
+  } catch (error) {
+    logger.error('Error sending vendor account created email:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   initialize,
   loadTemplate,
@@ -234,4 +266,5 @@ module.exports = {
   sendPasswordResetEmail,
   sendWelcomeEmail,
   sendTestEmail,
+  sendVendorAccountCreatedEmail,
 };

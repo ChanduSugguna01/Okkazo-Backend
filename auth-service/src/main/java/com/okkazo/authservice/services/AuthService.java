@@ -2,6 +2,8 @@ package com.okkazo.authservice.services;
 
 import com.okkazo.authservice.dtos.LoginRequestDto;
 import com.okkazo.authservice.dtos.LoginResponseDto;
+import com.okkazo.authservice.dtos.PromoteUserRequestDto;
+import com.okkazo.authservice.dtos.PromoteUserResponseDto;
 import com.okkazo.authservice.dtos.RegisterRequestDto;
 import com.okkazo.authservice.dtos.RegisterResponseDto;
 import com.okkazo.authservice.exceptions.*;
@@ -17,6 +19,7 @@ import com.okkazo.authservice.utils.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +38,9 @@ public class AuthService {
     private final EmailVerificationTokenRepository emailVerificationTokenRepository;
     private final JwtUtil jwtUtil;
     private final RefreshTokenService refreshTokenService;
+    
+    @Value("${admin.promote-key}")
+    private String adminPromoteKey;
 
     @Transactional
     public RegisterResponseDto register(RegisterRequestDto requestDto){
@@ -90,6 +96,7 @@ public class AuthService {
         authEvent.userRegistered(
                 user.getAuthId(),
                 user.getEmail(),
+                user.getUsername(),
                 token);
 
         log.info("User registered successfully: {}", user.getEmail());
@@ -110,6 +117,7 @@ public class AuthService {
         authEvent.userRegistered(
                 existingUser.getAuthId(),
                 existingUser.getEmail(),
+                existingUser.getUsername(),
                 rawToken);
         return new RegisterResponseDto("User registered successfully, Please verify your email.", true);
     }
@@ -123,14 +131,22 @@ public class AuthService {
             throw new AccountBlockedException("Your account has been blocked. Please contact support.");
         }
 
-        if (!passwordEncoder.matches(requestDto.password(), user.getHashedPassword())) {
-            throw new InvalidCredentialsException("Invalid email or password");
+        // Check verification status BEFORE password check for unverified users
+        if (!user.getIsVerified()) {
+            // Different message for vendors (need to set password) vs regular users (need to verify email)
+            if (user.getRole() == Role.VENDOR) {
+                throw new EmailNotVerifiedException(
+                        "Please set your password using the link sent to your email before logging in."
+                );
+            } else {
+                throw new EmailNotVerifiedException(
+                        "Please verify your email before logging in. Check your inbox for verification link."
+                );
+            }
         }
 
-        if (!user.getIsVerified()) {
-            throw new EmailNotVerifiedException(
-                    "Please verify your email before logging in. Check your inbox for verification link."
-            );
+        if (!passwordEncoder.matches(requestDto.password(), user.getHashedPassword())) {
+            throw new InvalidCredentialsException("Invalid email or password");
         }
 
         String accessToken = jwtUtil.generateAccessToken(
@@ -155,8 +171,66 @@ public class AuthService {
         return new LoginResponseDto(
                 accessToken,
                 refreshTokenJwt,
+                user.getRole().name(),
                 "Login successful",
                 true
         );
+    }
+
+    @Transactional
+    public PromoteUserResponseDto promoteUserToAdmin(PromoteUserRequestDto requestDto) {
+        // Validate security key
+        if (!adminPromoteKey.equals(requestDto.getKey())) {
+            log.warn("Invalid security key provided for promote user request: {}", requestDto.getEmail());
+            return PromoteUserResponseDto.builder()
+                    .success(false)
+                    .message("Invalid security key")
+                    .email(requestDto.getEmail())
+                    .previousRole(null)
+                    .newRole(null)
+                    .build();
+        }
+        
+        Auth user = repository.findByEmail(requestDto.getEmail())
+                .orElseThrow(() -> new UserNotFoundException("User not found with email: " + requestDto.getEmail()));
+
+        // Check if user is already an ADMIN
+        if (user.getRole() == Role.ADMIN) {
+            return PromoteUserResponseDto.builder()
+                    .success(false)
+                    .message("User is already an ADMIN")
+                    .email(user.getEmail())
+                    .previousRole(Role.ADMIN.name())
+                    .newRole(Role.ADMIN.name())
+                    .build();
+        }
+
+        // Only allow promotion if current role is USER
+        if (user.getRole() != Role.USER) {
+            return PromoteUserResponseDto.builder()
+                    .success(false)
+                    .message("Only users with USER role can be promoted to ADMIN. Current role: " + user.getRole().name())
+                    .email(user.getEmail())
+                    .previousRole(user.getRole().name())
+                    .newRole(user.getRole().name())
+                    .build();
+        }
+
+        String previousRole = user.getRole().name();
+        user.setRole(Role.ADMIN);
+        repository.save(user);
+
+        // Send event to user-service to update role there
+        authEvent.userRoleChanged(user.getAuthId(), user.getEmail(), previousRole, Role.ADMIN.name());
+
+        log.info("User promoted to ADMIN: {} (previous role: {})", user.getEmail(), previousRole);
+
+        return PromoteUserResponseDto.builder()
+                .success(true)
+                .message("User successfully promoted to ADMIN")
+                .email(user.getEmail())
+                .previousRole(previousRole)
+                .newRole(Role.ADMIN.name())
+                .build();
     }
 }
