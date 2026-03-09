@@ -4,6 +4,11 @@ server:
 spring:
   application:
     name: api-gateway
+  
+  # Increase buffer size for large file uploads through gateway
+  codec:
+    max-in-memory-size: 50MB
+  
   cloud:
     gateway:
       server:
@@ -45,17 +50,16 @@ spring:
                   args:
                     roles: ADMIN
 
-            # Vendor Routes - Vendor, Admin, Manager
-            - id: vendor-routes
-              uri: lb://user-service
+            # Vendor Service Routes - Vendor, Admin, Manager
+            - id: vendor-service
+              uri: lb://vendor-service
               predicates:
                 - Path=/api/vendor/**
               filters:
-                - RewritePath=/api/vendor/(?<segment>.*), /vendor/${segment}
                 - name: AuthenticationFilter
                 - name: RoleAuthorizationFilter
                   args:
-                    roles: VENDOR,ADMIN,MANAGER
+                    roles: USER,VENDOR,ADMIN,MANAGER
 
             # Manager Routes - Manager, Admin
             - id: manager-routes

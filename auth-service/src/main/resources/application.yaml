@@ -5,6 +5,14 @@ spring:
   application:
     name: auth-service
 
+  # File Upload Configuration
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 5MB        # Maximum size per file
+      max-request-size: 50MB    # Maximum size for entire request (multiple files)
+      file-size-threshold: 0    # Files written to disk immediately
+
   datasource:
     url: jdbc:postgresql://localhost:5433/okkazo_auth_db
     username: postgres
@@ -33,6 +41,15 @@ jwt:
       expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:900000}
   refresh-token:
     expiration: ${JWT_REFRESH_TOKEN_EXPIRATION:2592000000}
+
+cloudinary:
+  cloud-name: ${CLOUDINARY_CLOUD_NAME:your-cloudinary-cloud-name}
+  api-key: ${CLOUDINARY_API_KEY:your-cloudinary-api-key}
+  api-secret: ${CLOUDINARY_API_SECRET:your-cloudinary-api-secret}
+  folder: ${CLOUDINARY_FOLDER:okkazo/vendor-documents}
+
+admin:
+  promote-key: ${ADMIN_PROMOTE_KEY:okkazo-admin-secret-2026}
 
 eureka:
   client:

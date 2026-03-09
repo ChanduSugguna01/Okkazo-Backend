@@ -104,6 +104,10 @@ const handleEvent = async (event) => {
         await handleEmailVerificationResend(event);
         break;
 
+      case 'VENDOR_ACCOUNT_CREATED':
+        await handleVendorAccountCreated(event);
+        break;
+
       default:
         logger.warn(`Unknown event type: ${event.type}`);
     }
@@ -206,6 +210,43 @@ const handleEmailVerificationResend = async (event) => {
     logger.info('Verification email resent successfully', { authId, email });
   } catch (error) {
     logger.error('Error handling EMAIL_VERIFICATION_RESEND event:', error);
+    throw error;
+  }
+};
+
+const handleVendorAccountCreated = async (event) => {
+  try {
+    const { authId, email, passwordResetToken, businessName, applicationId } = event;
+
+    if (!authId || !email || !passwordResetToken || !businessName || !applicationId) {
+      logger.error('VENDOR_ACCOUNT_CREATED event missing required fields', {
+        event,
+      });
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      logger.error('VENDOR_ACCOUNT_CREATED event has invalid email format', {
+        email,
+      });
+      return;
+    }
+
+    logger.info('Processing VENDOR_ACCOUNT_CREATED event', { authId, email, businessName, applicationId });
+
+    // Send vendor account created email with set password link
+    await emailService.sendVendorAccountCreatedEmail(
+      email,
+      passwordResetToken,
+      businessName,
+      applicationId,
+      authId
+    );
+
+    logger.info('Vendor account created email sent successfully', { authId, email, applicationId });
+  } catch (error) {
+    logger.error('Error handling VENDOR_ACCOUNT_CREATED event:', error);
     throw error;
   }
 };

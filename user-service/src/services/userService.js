@@ -235,6 +235,44 @@ const updateLastLogin = async (authId) => {
 };
 
 /**
+ * Update user's role
+ */
+const updateUserRole = async (authId, newRole) => {
+  try {
+    if (!authId || authId.trim() === '') {
+      throw createApiError(400, 'Auth ID is required');
+    }
+
+    if (!newRole) {
+      throw createApiError(400, 'New role is required');
+    }
+
+    const validRoles = ['USER', 'VENDOR', 'ADMIN', 'MANAGER'];
+    if (!validRoles.includes(newRole.toUpperCase())) {
+      throw createApiError(400, `Invalid role. Must be one of: ${validRoles.join(', ')}`);
+    }
+
+    const user = await User.findOneAndUpdate(
+      { authId: authId.trim() },
+      { role: newRole.toUpperCase() },
+      { new: true }
+    );
+
+    if (!user) {
+      logger.warn(`User not found for role update: ${authId}`);
+      throw createApiError(404, 'User not found');
+    }
+
+    logger.info(`Role updated for user ${user.email}: ${newRole}`);
+    return user;
+  } catch (error) {
+    if (error.statusCode) throw error;
+    logger.error('Error updating user role:', error);
+    throw createApiError(500, 'Error updating user role');
+  }
+};
+
+/**
  * Get user statistics
  */
 const getUserStats = async () => {
@@ -274,5 +312,6 @@ module.exports = {
   deleteUser,
   getAllUsers,
   updateLastLogin,
+  updateUserRole,
   getUserStats,
 };

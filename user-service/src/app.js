@@ -20,7 +20,7 @@ const app = express();
 
 // Middleware
 app.use(helmet()); // Security headers
-app.use(cors()); // Enable CORS
+// app.use(cors()); // CORS handled by API Gateway
 app.use(compression()); // Compress responses
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies

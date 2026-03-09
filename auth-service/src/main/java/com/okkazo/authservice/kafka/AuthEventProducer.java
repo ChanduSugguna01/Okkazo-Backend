@@ -4,6 +4,9 @@ import com.okkazo.authservice.dtos.EmailVerificationResendEvent;
 import com.okkazo.authservice.dtos.PasswordResetEvent;
 import com.okkazo.authservice.dtos.UserLoginEvent;
 import com.okkazo.authservice.dtos.UserRegistrationEvent;
+import com.okkazo.authservice.dtos.UserRoleChangedEvent;
+import com.okkazo.authservice.dtos.VendorAccountCreatedEvent;
+import com.okkazo.authservice.dtos.VendorRegistrationEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -20,11 +23,12 @@ public class AuthEventProducer {
     @Value("${kafka.topic.name}")
     private String topicName;
 
-    public void userRegistered(UUID authId, String email, String verificationToken){
+    public void userRegistered(UUID authId, String email, String username, String verificationToken){
         UserRegistrationEvent event = new UserRegistrationEvent(
                 "USER_REGISTERED",
                 authId,
                 email,
+                username,
                 verificationToken
         );
         kafkaTemplate.send(topicName, authId.toString(), event);
@@ -55,6 +59,34 @@ public class AuthEventProducer {
                 "USER_LOGIN",
                 authId,
                 email,
+                LocalDateTime.now()
+        );
+        kafkaTemplate.send(topicName, authId.toString(), event);
+    }
+    
+    public void vendorRegistrationSubmitted(VendorRegistrationEvent event){
+        kafkaTemplate.send("vendor_events", event.getApplicationId(), event);
+    }
+    
+    public void vendorAccountCreated(UUID authId, String email, String passwordResetToken, String businessName, String applicationId){
+        VendorAccountCreatedEvent event = new VendorAccountCreatedEvent(
+                "VENDOR_ACCOUNT_CREATED",
+                authId,
+                email,
+                passwordResetToken,
+                businessName,
+                applicationId
+        );
+        kafkaTemplate.send(topicName, authId.toString(), event);
+    }
+
+    public void userRoleChanged(UUID authId, String email, String previousRole, String newRole){
+        UserRoleChangedEvent event = new UserRoleChangedEvent(
+                "USER_ROLE_CHANGED",
+                authId,
+                email,
+                previousRole,
+                newRole,
                 LocalDateTime.now()
         );
         kafkaTemplate.send(topicName, authId.toString(), event);

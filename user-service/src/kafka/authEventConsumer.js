@@ -102,6 +102,10 @@ const handleEvent = async (event) => {
         // Handle email verification resend if needed
         break;
 
+      case 'USER_ROLE_CHANGED':
+        await handleUserRoleChanged(event);
+        break;
+
       default:
         logger.warn(`Unknown event type: ${event.type}`);
     }
@@ -113,12 +117,12 @@ const handleEvent = async (event) => {
 
 const handleUserRegistered = async (event) => {
   try {
-    const { authId, email, verificationToken } = event;
+    const { authId, email, username, verificationToken } = event;
 
     // Validate required fields
-    if (!authId || !email) {
+    if (!authId || !email || !username) {
       logger.error('USER_REGISTERED event missing required fields', { event });
-      throw new Error('Invalid event data: authId and email are required');
+      throw new Error('Invalid event data: authId, email, and username are required');
     }
 
     // Validate email format
@@ -128,10 +132,7 @@ const handleUserRegistered = async (event) => {
       throw new Error('Invalid email format');
     }
 
-    logger.info('Processing USER_REGISTERED event', { authId, email });
-
-    // Extract username from email (before @)
-    const username = email.split('@')[0];
+    logger.info('Processing USER_REGISTERED event', { authId, email, username });
 
     // Create user profile
     const userData = {
@@ -193,6 +194,45 @@ const handleUserLogin = async (event) => {
       return null;
     }
     logger.error('Error handling USER_LOGIN event:', error);
+    throw error;
+  }
+};
+
+const handleUserRoleChanged = async (event) => {
+  try {
+    const { authId, email, previousRole, newRole, changedAt } = event;
+
+    // Validate required fields
+    if (!authId || !newRole) {
+      logger.error('USER_ROLE_CHANGED event missing required fields', { event });
+      throw new Error('Invalid event data: authId and newRole are required');
+    }
+
+    logger.info('Processing USER_ROLE_CHANGED event', { 
+      authId, 
+      email,
+      previousRole,
+      newRole,
+      changedAt
+    });
+
+    // Update user role in user service
+    const user = await userService.updateUserRole(authId, newRole);
+    
+    logger.info('User role updated successfully', {
+      authId,
+      email: user.email,
+      previousRole,
+      newRole,
+    });
+
+    return user;
+  } catch (error) {
+    if (error.message.includes('not found')) {
+      logger.warn('User not found for role change event', { authId: event.authId });
+      return null;
+    }
+    logger.error('Error handling USER_ROLE_CHANGED event:', error);
     throw error;
   }
 };

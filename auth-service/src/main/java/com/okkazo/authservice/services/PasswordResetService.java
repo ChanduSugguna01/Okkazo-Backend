@@ -103,6 +103,14 @@ public class PasswordResetService {
 
         // Update password
         user.setHashedPassword(passwordEncoder.encode(requestDto.newPassword()));
+        
+        // Auto-verify vendors when they set their password for the first time
+        if (user.getRole() == com.okkazo.authservice.models.Role.VENDOR && !user.getIsVerified()) {
+            user.setIsVerified(true);
+            user.setStatus(Status.ACTIVE);
+            log.info("Auto-verified vendor account after password setup: {}", user.getEmail());
+        }
+        
         authRepository.save(user);
 
         // Mark token as used

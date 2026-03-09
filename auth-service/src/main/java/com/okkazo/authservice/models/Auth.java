@@ -32,17 +32,11 @@ public class Auth {
     @Column(name = "is_verified", nullable = false)
     private Boolean isVerified = false;
 
-    @Column(
-            nullable = false,
-            columnDefinition = "varchar(20) default 'UNVERIFIED'"
-    )
+    @Column(nullable = false, length = 20)
     @Enumerated(EnumType.STRING)
     private Status status;
 
-    @Column(
-            nullable = false,
-            columnDefinition = "varchar(20) default 'USER'"
-    )
+    @Column(nullable = false, length = 20)
     @Enumerated(EnumType.STRING)
     private Role role;
 

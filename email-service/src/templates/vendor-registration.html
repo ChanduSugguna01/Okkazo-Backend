@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vendor Application Received</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7fa;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: #ffffff;
+            padding: 40px 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        .header p {
+            margin: 10px 0 0;
+            font-size: 16px;
+            opacity: 0.95;
+        }
+        .content {
+            padding: 40px 30px;
+            color: #333333;
+        }
+        .content h2 {
+            color: #6366f1;
+            font-size: 22px;
+            margin: 0 0 20px;
+            font-weight: 600;
+        }
+        .content p {
+            line-height: 1.8;
+            font-size: 16px;
+            margin: 15px 0;
+            color: #4b5563;
+        }
+        .info-box {
+            background-color: #f0f9ff;
+            border-left: 4px solid #6366f1;
+            padding: 20px;
+            margin: 25px 0;
+            border-radius: 6px;
+        }
+        .info-box p {
+            margin: 8px 0;
+            font-size: 15px;
+        }
+        .info-box strong {
+            color: #1e293b;
+            font-weight: 600;
+        }
+        .info-code {
+            background-color: #eef2ff;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            color: #6366f1;
+            display: inline-block;
+            margin: 5px 0;
+        }
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: #ffffff;
+            text-decoration: none;
+            padding: 16px 40px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            text-align: center;
+            margin: 25px 0;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+            transition: transform 0.2s;
+        }
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+        }
+        .button-container {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .steps {
+            background-color: #fafafa;
+            padding: 25px;
+            border-radius: 8px;
+            margin: 25px 0;
+        }
+        .steps h3 {
+            color: #1e293b;
+            font-size: 18px;
+            margin: 0 0 15px;
+            font-weight: 600;
+        }
+        .step {
+            margin: 12px 0;
+            padding-left: 30px;
+            position: relative;
+            color: #4b5563;
+        }
+        .step::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #10b981;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        .warning {
+            background-color: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            margin: 25px 0;
+            border-radius: 6px;
+        }
+        .warning p {
+            margin: 5px 0;
+            color: #92400e;
+            font-size: 14px;
+        }
+        .footer {
+            background-color: #f9fafb;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+        }
+        .footer p {
+            margin: 8px 0;
+            font-size: 14px;
+            color: #6b7280;
+        }
+        .footer a {
+            color: #6366f1;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .divider {
+            height: 1px;
+            background-color: #e5e7eb;
+            margin: 30px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🎉 Application Received!</h1>
+            <p>Welcome to {{platformName}} Vendor Network</p>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <h2>Hello {{businessName}}!</h2>
+            
+            <p>
+                Thank you for submitting your vendor registration application. We're excited to review your application 
+                and potentially welcome you to our platform!
+            </p>
+
+            <div class="info-box">
+                <p><strong>Application ID:</strong> <span class="info-code">{{applicationId}}</span></p>
+                <p><strong>Registered Email:</strong> {{email}}</p>
+                <p><strong>Estimated Review Time:</strong> {{estimatedTime}}</p>
+            </div>
+
+            <div class="divider"></div>
+
+            <h2>🔑 Set Your Password to Get Started</h2>
+            
+            <p>
+                We've created your vendor account! To access your dashboard and track your application status, 
+                please set your password by clicking the button below:
+            </p>
+
+            <div class="button-container">
+                <a href="{{setPasswordLink}}" class="cta-button">Set My Password</a>
+            </div>
+
+            <div class="warning">
+                <p><strong>⚠️ Important:</strong> This link will expire in {{expiryTime}}. If you don't set your password within this time, you'll need to request a new password reset link.</p>
+            </div>
+
+            <div class="steps">
+                <h3>What Happens Next?</h3>
+                <div class="step">Set your password using the link above</div>
+                <div class="step">Login to your vendor dashboard</div>
+                <div class="step">Track your application status in real-time</div>
+                <div class="step">Upload additional documents if requested</div>
+                <div class="step">Receive approval notification (typically within {{estimatedTime}})</div>
+                <div class="step">Start offering your services on {{platformName}}!</div>
+            </div>
+
+            <p>
+                Once your password is set, you can login to your account to:
+            </p>
+            <ul style="color: #4b5563; line-height: 1.8;">
+                <li>View your application status</li>
+                <li>Upload additional documentation if required</li>
+                <li>Update your business information</li>
+                <li>Receive notifications about your application</li>
+            </ul>
+
+            <div class="divider"></div>
+
+            <p style="color: #6b7280; font-size: 14px; font-style: italic;">
+                <strong>Note:</strong> You can login and track your application even before it's approved. 
+                Once approved by our admin team, you'll be able to access all vendor features.
+            </p>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>
+                <strong>Need Help?</strong> Contact us at 
+                <a href="mailto:{{supportEmail}}">{{supportEmail}}</a>
+            </p>
+            <p style="margin-top: 15px;">
+                This email was sent to <strong>{{email}}</strong> regarding your vendor application.
+            </p>
+            <p style="color: #9ca3af; font-size: 13px; margin-top: 20px;">
+                © 2024 {{platformName}}. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
