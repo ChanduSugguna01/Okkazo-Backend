@@ -85,6 +85,24 @@ const fetchPlanningQuoteLatestForUser = async (eventId, user) => {
   return response.data?.data;
 };
 
+const fetchVendorSelectionForUser = async (eventId, user) => {
+  const response = await axios.get(`${eventServiceUrl}/vendor-selection/${encodeURIComponent(eventId)}`, {
+    timeout: httpTimeoutMs,
+    params: {
+      includeVendors: 'true',
+    },
+    headers: {
+      'x-auth-id': user?.authId || '',
+      'x-user-id': user?._id?.toString?.() || user?.id || '',
+      'x-user-email': user?.email || '',
+      'x-user-username': user?.name || user?.username || '',
+      'x-user-role': user?.role || 'USER',
+    },
+  });
+
+  return response.data?.data;
+};
+
 const handlePlanningQuoteLocked = async (event) => {
   const { eventId, authId, version } = event || {};
 
@@ -122,15 +140,87 @@ const handlePlanningQuoteLocked = async (event) => {
     return;
   }
 
+  let selection = null;
+  try {
+    selection = await fetchVendorSelectionForUser(eventId, { ...owner, role: owner?.role || 'USER' });
+  } catch (e) {
+    logger.warn('Failed to fetch vendor selection for quote email (non-blocking)', {
+      eventId,
+      authId,
+      message: e?.message || String(e),
+    });
+  }
+
   const eventTitle = planning?.eventTitle || planning?.eventName || 'Event';
   const eventDate = planning?.eventDate || planning?.schedule?.startAt || quote?.eventStartAt || null;
   const eventLocation = planning?.location?.name || planning?.location?.location || null;
+
+  const normalizeLookup = (value) => String(value || '').trim().toLowerCase();
+  const toItemLookupKey = (vendorAuthId, service) => {
+    const vendorKey = normalizeLookup(vendorAuthId);
+    const serviceKey = normalizeLookup(service);
+    if (!vendorKey || !serviceKey) return null;
+    return `${vendorKey}::${serviceKey}`;
+  };
+
+  const vendorProfiles = Array.isArray(selection?.vendorProfiles) ? selection.vendorProfiles : [];
+  const vendorProfileByAuthId = new Map();
+  for (const profile of vendorProfiles) {
+    const authKeys = [profile?.authId, profile?.vendorAuthId, profile?.userAuthId]
+      .map((v) => String(v || '').trim())
+      .filter(Boolean);
+    for (const authKey of authKeys) {
+      if (!vendorProfileByAuthId.has(authKey)) {
+        vendorProfileByAuthId.set(authKey, profile);
+      }
+    }
+  }
+
+  const selectionMetaByVendorService = new Map();
+  const selectionVendors = Array.isArray(selection?.vendors) ? selection.vendors : [];
+  for (const row of selectionVendors) {
+    const vendorAuthId = String(row?.vendorAuthId || '').trim();
+    const serviceName = String(row?.serviceName || row?.service || '').trim();
+    const key = toItemLookupKey(vendorAuthId, row?.service);
+    if (!key) continue;
+
+    const pricingQuantityRaw = Number(row?.pricingQuantity);
+    const pricingQuantity = Number.isFinite(pricingQuantityRaw) && pricingQuantityRaw > 0
+      ? pricingQuantityRaw
+      : null;
+    const quantityUnit = String(row?.pricingQuantityUnit || row?.pricingUnit || '').trim();
+    const quantity = pricingQuantity != null
+      ? `${pricingQuantity}${quantityUnit ? ` ${quantityUnit}` : ''}`
+      : (quantityUnit || '—');
+
+    const profile = vendorProfileByAuthId.get(vendorAuthId) || null;
+    const businessName = String(
+      profile?.businessName ||
+      profile?.name ||
+      row?.businessName ||
+      ''
+    ).trim();
+
+    selectionMetaByVendorService.set(key, {
+      serviceName: serviceName || null,
+      quantity,
+      businessName: businessName || null,
+    });
+  }
 
   const vendorCache = new Map();
   const resolveVendorName = async (vendorAuthId) => {
     const key = String(vendorAuthId || '').trim();
     if (!key) return '—';
     if (vendorCache.has(key)) return vendorCache.get(key);
+
+    const profile = vendorProfileByAuthId.get(key);
+    const profileName = String(profile?.businessName || profile?.name || '').trim();
+    if (profileName) {
+      vendorCache.set(key, profileName);
+      return profileName;
+    }
+
     const u = await fetchUserByAuthId(key);
     const name = u?.businessName || u?.vendorName || u?.name || u?.username || 'Vendor';
     vendorCache.set(key, name);
@@ -140,18 +230,43 @@ const handlePlanningQuoteLocked = async (event) => {
   const quoteItems = Array.isArray(quote?.items) ? quote.items : [];
   const userItems = [];
   for (const it of quoteItems) {
-    const vendorName = await resolveVendorName(it?.vendorAuthId);
+    const vendorAuthId = String(it?.vendorAuthId || '').trim();
+    const metaKey = toItemLookupKey(vendorAuthId, it?.service);
+    const selectionMeta = metaKey ? selectionMetaByVendorService.get(metaKey) : null;
+    const vendorName = selectionMeta?.businessName || await resolveVendorName(vendorAuthId);
+    const itemTotalPaise = Number(
+      it?.vendorTotal?.minPaise ??
+      it?.vendorTotal?.maxPaise ??
+      it?.clientTotal?.minPaise ??
+      it?.clientTotal?.maxPaise ??
+      0
+    );
+
     userItems.push({
-      service: it?.service || 'Service',
+      service: selectionMeta?.serviceName || it?.service || 'Service',
       vendorName,
-      clientRange: formatMoneyRangeFromPaise(it?.clientTotal?.minPaise, it?.clientTotal?.maxPaise),
+      quantity: selectionMeta?.quantity || '—',
+      clientTotal: formatMoneyFromPaise(itemTotalPaise),
     });
   }
 
-  const promotionsTotal = quote?.promotionsTotal?.minPaise
-    ? formatMoneyFromPaise(quote.promotionsTotal.minPaise)
+  const promotions = (Array.isArray(quote?.promotions) ? quote.promotions : [])
+    .map((p) => ({
+      name: String(p?.value || '').trim() || 'Promotion',
+      price: formatMoneyFromPaise(p?.feePaise),
+    }))
+    .filter((p) => p.name);
+
+  const promotionsTotalPaise = Number(quote?.promotionsTotal?.minPaise ?? quote?.promotionsTotal?.maxPaise ?? 0);
+  const promotionsTotal = promotionsTotalPaise > 0
+    ? formatMoneyFromPaise(promotionsTotalPaise)
     : null;
-  const grandTotal = formatMoneyRangeFromPaise(quote?.clientGrandTotal?.minPaise, quote?.clientGrandTotal?.maxPaise);
+
+  const vendorSubtotalPaise = Number(quote?.vendorSubtotal?.minPaise ?? quote?.vendorSubtotal?.maxPaise ?? 0);
+  const totalAmountPaise = (vendorSubtotalPaise > 0 || promotionsTotalPaise > 0)
+    ? Math.max(0, vendorSubtotalPaise) + Math.max(0, promotionsTotalPaise)
+    : Number(quote?.clientGrandTotal?.minPaise ?? quote?.clientGrandTotal?.maxPaise ?? 0);
+  const totalAmount = formatMoneyFromPaise(totalAmountPaise);
 
   await emailService.sendPlanningQuoteLockedUserEmail(owner.email, {
     recipientName: owner?.name || owner?.username || 'there',
@@ -161,8 +276,9 @@ const handlePlanningQuoteLocked = async (event) => {
     eventLocation,
     version: quote?.version || version || 1,
     items: userItems,
+    promotions,
     promotionsTotal,
-    grandTotal,
+    totalAmount,
   });
 
   sentQuoteEmails.set(userDedupeKey, Date.now());
