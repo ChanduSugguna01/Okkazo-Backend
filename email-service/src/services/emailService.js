@@ -415,8 +415,9 @@ const sendPlanningQuoteLockedUserEmail = async (email, details) => {
       eventLocation,
       version,
       items,
+      promotions,
       promotionsTotal,
-      grandTotal,
+      totalAmount,
     } = details || {};
 
     if (!eventId) throw new Error('eventId is required');
@@ -431,8 +432,9 @@ const sendPlanningQuoteLockedUserEmail = async (email, details) => {
       eventLocation: eventLocation || null,
       version: version || 1,
       items: Array.isArray(items) ? items : [],
+      promotions: Array.isArray(promotions) ? promotions : [],
       promotionsTotal: promotionsTotal || null,
-      grandTotal: grandTotal || null,
+      totalAmount: totalAmount || null,
       platformName: 'Okkazo',
       supportEmail: process.env.FROM_EMAIL,
     });
