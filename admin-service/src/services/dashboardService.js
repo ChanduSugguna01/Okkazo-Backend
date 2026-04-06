@@ -12,6 +12,7 @@ const requestService = async ({ baseUrl, path, user, query, timeout = 15000 }) =
 };
 
 const VALID_ANALYTICS_WINDOWS = new Set(['last30', 'last90', 'last180', 'ytd']);
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const startOfUtcDay = (value) => {
   const date = new Date(value);
@@ -25,23 +26,23 @@ const endOfUtcDay = (value) => {
   return date;
 };
 
-const buildAnalyticsWindow = (windowKey = 'last180') => {
+const buildAnalyticsWindow = (windowKey = 'last30') => {
   const normalizedWindow = VALID_ANALYTICS_WINDOWS.has(String(windowKey || '').trim().toLowerCase())
     ? String(windowKey).trim().toLowerCase()
-    : 'last180';
+    : 'last30';
 
   const now = new Date();
   const to = endOfUtcDay(now);
   const from = startOfUtcDay(now);
 
-  if (normalizedWindow === 'ytd') {
-    from.setUTCMonth(0, 1);
-  } else if (normalizedWindow === 'last30') {
+  if (normalizedWindow === 'last30') {
     from.setUTCDate(from.getUTCDate() - 29);
   } else if (normalizedWindow === 'last90') {
     from.setUTCDate(from.getUTCDate() - 89);
-  } else {
+  } else if (normalizedWindow === 'last180') {
     from.setUTCDate(from.getUTCDate() - 179);
+  } else if (normalizedWindow === 'ytd') {
+    from.setUTCMonth(0, 1);
   }
 
   return {
@@ -51,41 +52,71 @@ const buildAnalyticsWindow = (windowKey = 'last180') => {
   };
 };
 
-const buildReportQueryFromWindow = ({ windowKey, from, to }) => {
-  if (windowKey === 'last30' || windowKey === 'last90' || windowKey === 'ytd') {
-    return {
-      range: windowKey,
-      recentLimit: 6,
-    };
-  }
-
-  return {
-    range: 'custom',
-    from: from.toISOString(),
-    to: to.toISOString(),
-    recentLimit: 6,
-  };
+const getInclusiveWindowDays = ({ from, to }) => {
+  const fromDay = startOfUtcDay(from).getTime();
+  const toDay = startOfUtcDay(to).getTime();
+  return Math.max(1, Math.floor((toDay - fromDay) / DAY_MS) + 1);
 };
 
+const toDayKey = (date) => `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
 const toMonthKey = (date) => `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+
+const toDayLabel = (date) => date.toLocaleDateString('en-US', {
+  day: '2-digit',
+  month: 'short',
+  timeZone: 'UTC',
+});
 
 const toMonthLabel = (date) => date.toLocaleDateString('en-US', {
   month: 'short',
+  year: '2-digit',
   timeZone: 'UTC',
-}).toUpperCase();
+});
 
-const buildMonthlyRevenueOverview = ({ rows = [], from, to, maxBuckets = 6 }) => {
+const buildDailyRevenueOverview = ({ rows = [], from, to }) => {
+  const dayBuckets = [];
+  const cursor = startOfUtcDay(from);
+  const end = endOfUtcDay(to);
+
+  while (cursor.getTime() <= end.getTime()) {
+    dayBuckets.push(new Date(cursor));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  const amountByDay = new Map(dayBuckets.map((dayDate) => [toDayKey(dayDate), 0]));
+
+  rows.forEach((row) => {
+    const date = row?.paidAt ? new Date(row.paidAt) : new Date(row?.createdAt || 0);
+    if (Number.isNaN(date.getTime())) return;
+
+    const key = toDayKey(date);
+    if (!amountByDay.has(key)) return;
+
+    const previous = Number(amountByDay.get(key) || 0);
+    amountByDay.set(key, previous + Number(row?.amount || 0));
+  });
+
+  return dayBuckets.map((dayDate) => {
+    const key = toDayKey(dayDate);
+    return {
+      label: toDayLabel(dayDate),
+      currentRevenue: Number(amountByDay.get(key) || 0),
+      previousRevenue: 0,
+    };
+  });
+};
+
+const buildMonthlyRevenueOverview = ({ rows = [], from, to }) => {
   const monthBuckets = [];
   const cursor = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), 1));
-  const endCursor = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), 1));
+  const end = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), 1));
 
-  while (cursor.getTime() <= endCursor.getTime()) {
+  while (cursor.getTime() <= end.getTime()) {
     monthBuckets.push(new Date(cursor));
     cursor.setUTCMonth(cursor.getUTCMonth() + 1);
   }
 
-  const selectedBuckets = monthBuckets.slice(-maxBuckets);
-  const amountByMonth = new Map(selectedBuckets.map((monthDate) => [toMonthKey(monthDate), 0]));
+  const amountByMonth = new Map(monthBuckets.map((monthDate) => [toMonthKey(monthDate), 0]));
 
   rows.forEach((row) => {
     const date = row?.paidAt ? new Date(row.paidAt) : new Date(row?.createdAt || 0);
@@ -98,7 +129,7 @@ const buildMonthlyRevenueOverview = ({ rows = [], from, to, maxBuckets = 6 }) =>
     amountByMonth.set(key, previous + Number(row?.amount || 0));
   });
 
-  return selectedBuckets.map((monthDate) => {
+  return monthBuckets.map((monthDate) => {
     const key = toMonthKey(monthDate);
     return {
       label: toMonthLabel(monthDate),
@@ -106,6 +137,29 @@ const buildMonthlyRevenueOverview = ({ rows = [], from, to, maxBuckets = 6 }) =>
       previousRevenue: 0,
     };
   });
+};
+
+const buildRevenueOverview = ({ rows = [], from, to, windowDays = 30 }) => {
+  if (Number(windowDays || 0) > 31) {
+    return buildMonthlyRevenueOverview({ rows, from, to });
+  }
+  return buildDailyRevenueOverview({ rows, from, to });
+};
+
+const fetchLedgerSummaryForWindow = async ({ orderServiceUrl, user, from, to }) => {
+  const payload = await requestService({
+    baseUrl: orderServiceUrl,
+    path: '/orders/admin/ledger',
+    user,
+    query: {
+      page: 1,
+      limit: 1,
+      from: from.toISOString(),
+      to: to.toISOString(),
+    },
+  });
+
+  return payload?.summary || { totalLedgerVolume: 0, pendingSettlements: 0, activeVendors: 0 };
 };
 
 const parseVendorActivityDate = (application) => {
@@ -257,37 +311,35 @@ const getAdminDashboard = async (query = {}, user) => {
   const userServiceUrl = process.env.USER_SERVICE_URL || 'http://user-service:8082';
   const vendorServiceUrl = process.env.VENDOR_SERVICE_URL || 'http://vendor-service:8084';
 
-  const analyticsWindow = buildAnalyticsWindow(query.analyticsWindow || query.range || 'last180');
-  const reportQuery = buildReportQueryFromWindow(analyticsWindow);
+  const analyticsWindow = buildAnalyticsWindow(query.analyticsWindow || query.range || 'last30');
+  const windowDays = getInclusiveWindowDays({ from: analyticsWindow.from, to: analyticsWindow.to });
 
   const dashboardLimit = Math.min(Math.max(Number(query.limit || 150), 10), 500);
 
-  const vendorsCurrentFrom = startOfUtcDay(analyticsWindow.to);
-  vendorsCurrentFrom.setUTCDate(vendorsCurrentFrom.getUTCDate() - 29);
+  const vendorsCurrentFrom = startOfUtcDay(analyticsWindow.from);
   const vendorsCurrentTo = endOfUtcDay(analyticsWindow.to);
 
   const vendorsPreviousTo = new Date(vendorsCurrentFrom.getTime() - 1);
   const vendorsPreviousFrom = startOfUtcDay(vendorsPreviousTo);
-  vendorsPreviousFrom.setUTCDate(vendorsPreviousFrom.getUTCDate() - 29);
+  vendorsPreviousFrom.setUTCDate(vendorsPreviousFrom.getUTCDate() - (windowDays - 1));
 
   const vendorsCurrent7From = startOfUtcDay(analyticsWindow.to);
   vendorsCurrent7From.setUTCDate(vendorsCurrent7From.getUTCDate() - 6);
   const vendorsCurrent7To = endOfUtcDay(analyticsWindow.to);
 
+  const revenuePreviousTo = new Date(analyticsWindow.from.getTime() - 1);
+  const revenuePreviousFrom = startOfUtcDay(revenuePreviousTo);
+  revenuePreviousFrom.setUTCDate(revenuePreviousFrom.getUTCDate() - (windowDays - 1));
+
   const [
-    reportData,
     planningData,
     promoteData,
     userStats,
     approvedVendorsResult,
     ledgerTransactions,
+    currentLedgerSummary,
+    previousLedgerSummary,
   ] = await Promise.all([
-    requestService({
-      baseUrl: orderServiceUrl,
-      path: '/orders/admin/reports',
-      user,
-      query: reportQuery,
-    }),
     requestService({
       baseUrl: eventServiceUrl,
       path: '/planning/admin/dashboard',
@@ -314,6 +366,18 @@ const getAdminDashboard = async (query = {}, user) => {
       user,
       from: analyticsWindow.from,
       to: analyticsWindow.to,
+    }),
+    fetchLedgerSummaryForWindow({
+      orderServiceUrl,
+      user,
+      from: analyticsWindow.from,
+      to: analyticsWindow.to,
+    }),
+    fetchLedgerSummaryForWindow({
+      orderServiceUrl,
+      user,
+      from: revenuePreviousFrom,
+      to: revenuePreviousTo,
     }),
   ]);
 
@@ -389,7 +453,8 @@ const getAdminDashboard = async (query = {}, user) => {
     revenue: Number(revenueByEventId.get(item.eventId) || 0),
   }));
 
-  const summary = reportData?.summary || {};
+  const currentTotalRevenue = Number(currentLedgerSummary?.totalLedgerVolume || 0);
+  const previousTotalRevenue = Number(previousLedgerSummary?.totalLedgerVolume || 0);
   const approvedVendorApplications = Array.isArray(approvedVendorsResult?.applications)
     ? approvedVendorsResult.applications
     : [];
@@ -409,19 +474,19 @@ const getAdminDashboard = async (query = {}, user) => {
     from: vendorsCurrent7From,
     to: vendorsCurrent7To,
   });
-  const growthRatePercent = Number(summary?.growthRatePercent || 0);
+  const growthRatePercent = calculateTrendPercent(currentTotalRevenue, previousTotalRevenue);
   const vendorGrowthPercent = calculateTrendPercent(vendorsCurrent30, vendorsPrevious30);
-  const revenueOverview = buildMonthlyRevenueOverview({
+  const revenueOverview = buildRevenueOverview({
     rows: ledgerTransactions,
     from: analyticsWindow.from,
     to: analyticsWindow.to,
-    maxBuckets: 6,
+    windowDays,
   });
 
   return {
     analyticsWindow: analyticsWindow.windowKey,
     summaryCards: {
-      totalRevenue: Number(summary?.totalRevenue || 0),
+      totalRevenue: currentTotalRevenue,
       totalRevenueTrendPercent: growthRatePercent,
       activeEvents: activeEventsCount,
       activeEventsTrendPercent: activeEventsCount > 0

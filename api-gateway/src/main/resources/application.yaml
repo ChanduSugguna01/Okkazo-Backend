@@ -183,6 +183,18 @@ spring:
               predicates:
                 - Path=/socket.io/**
 
+            # Notification Service Routes (All authenticated users)
+            - id: notification-service
+              uri: lb://notification-service
+              predicates:
+                - Path=/api/notifications,/api/notifications/**
+              filters:
+                - RewritePath=/api/notifications/?(?<segment>.*), /${segment}
+                - name: AuthenticationFilter
+                - name: RoleAuthorizationFilter
+                  args:
+                    roles: USER,VENDOR,ADMIN,MANAGER
+
           globalcors:
             cors-configurations:
               '[/**]':
