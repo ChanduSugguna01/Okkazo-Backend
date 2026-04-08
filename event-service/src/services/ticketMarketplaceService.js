@@ -8,6 +8,7 @@ const { USER_TICKET_STATUS, USER_TICKET_VERIFICATION_STATUS } = require('../util
 const createApiError = require('../utils/ApiError');
 const logger = require('../utils/logger');
 const { fetchUserByAuthId } = require('./userServiceClient');
+const promoteConfigService = require('./promoteConfigService');
 const { signTicketQrToken, verifyTicketQrToken } = require('../utils/ticketQrToken');
 
 const ORDER_SERVICE_URL = (process.env.ORDER_SERVICE_URL || 'http://order-service:8087').replace(/\/$/, '');
@@ -772,10 +773,17 @@ const prepareTicketPurchase = async ({ eventId, userAuthId, userId, tiers, selec
     throw createApiError(400, 'Computed ticket amount is invalid');
   }
 
-  // Pricing rule: Service fee 20% of ticket subtotal + Processing fee 20% of ticket subtotal.
+  const feesConfig = await promoteConfigService.getFees();
+  const serviceChargePercentRaw = Number(feesConfig?.serviceChargePercent);
+  const serviceChargePercent = Number.isFinite(serviceChargePercentRaw)
+    ? Math.max(0, Math.min(100, serviceChargePercentRaw))
+    : 0;
+
+  // Pricing rule: both Service Fee and Processing Fee follow admin-configured service charge %.
   const subtotalInPaise = totalAmountInPaise;
-  const serviceFeeInPaise = subtotalInPaise > 0 ? Math.round(subtotalInPaise * 0.2) : 0;
-  const processingFeeInPaise = subtotalInPaise > 0 ? Math.round(subtotalInPaise * 0.2) : 0;
+  const feeRate = serviceChargePercent / 100;
+  const serviceFeeInPaise = subtotalInPaise > 0 ? Math.round(subtotalInPaise * feeRate) : 0;
+  const processingFeeInPaise = subtotalInPaise > 0 ? Math.round(subtotalInPaise * feeRate) : 0;
   const payableAmountInPaise = subtotalInPaise + serviceFeeInPaise + processingFeeInPaise;
 
   const avgUnitPrice = totalQuantity > 0
@@ -873,6 +881,7 @@ const prepareTicketPurchase = async ({ eventId, userAuthId, userId, tiers, selec
     quantity: ticket?.tickets?.noOfTickets || 0,
     subtotalInPaise,
     subtotalInInr: Number((subtotalInPaise / 100).toFixed(2)),
+    serviceChargePercent,
     serviceFeeInPaise,
     serviceFeeInInr: Number((serviceFeeInPaise / 100).toFixed(2)),
     processingFeeInPaise,
